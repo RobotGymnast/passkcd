@@ -1,0 +1,26 @@
+Do some back-of-the-hand math for the security of these passwords.
+
+The ideal is to model the causative influences between the entropy of data,
+and then give the user the option of saying "I've lost this many bits here,
+how does it affect my overall security?"
+
+info :: SetMember Lift (Lift IO) r
+      => IO (Usage (Text -> Eff r ()))
+info = do
+      askDict <- getDictionary
+      num <- compileSimple `withShow` "[0-9]\\+"
+      return $ Uses [(askDict, Uses [(num, Done infoDo)])]
+  where
+    infoDo tlen tdict _ = withDecimal tlen
+                        $ \len -> do
+              dict <- readDictionary $ unpack tdict
+              k <- lg . rangeSize <$> getRange (entries dict)
+              t <- lg . (10^12 /) <$> cpuTimePrecision
+              putStrLn $ "If your dictionary is shuffled[1], you get ~"
+                      <> show (k * len) <> " bits of entropy for having "
+                      <> show l <> " words in your password."
+              putStrLn   "otherwise, you get 0."
+              putStrLn   ""
+              putStrLn $ "In this environment, you also get ~"
+                      <> show t <> " bits of entropy for every second of "
+                      <> "uncertainty around when you generated the password."

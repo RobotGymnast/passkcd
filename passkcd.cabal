@@ -1,0 +1,30 @@
+Name:               passkcd
+Version:            0.0.1
+Synopsis:           Create a human-readable list of random words
+Description:        This package creates a securely random list of words to be
+                    used as a password.
+Category:           Cryptography
+License:            MIT
+Author:             Ben Foppa
+Homepage:           https://github.com/RobotGymnast/passkcd
+Maintainer:         benjamin.foppa@gmail.com
+Build-Type:         Simple
+Tested-With:        GHC==7.6.3
+Cabal-Version:      >= 1.9.2
+
+Executable passkcd
+    hs-source-dirs:    src/
+    Main-is:           Main.hs
+    GHC-Options:       -Wall -Werror -threaded -rtsopts=all
+
+    Build-Depends: 
+                    system-random-effect ==0.3.*,
+                    extensible-effects ==1.2.*,
+                    regex-posix ==0.95.*,
+                    array ==0.5.*,
+                    text ==0.11.*,
+                    base ==4.*
+
+source-repository head
+  type: git
+  location: https://github.com/RobotGymnast/passkcd
