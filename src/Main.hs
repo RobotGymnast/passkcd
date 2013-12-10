@@ -43,7 +43,8 @@ withDecimal t f = case decimal t of
         _ -> error $ "error parsing length " <> show t
 
 compileSimple :: String -> IO Regex
-compileSimple = fmap (either (error . show) id) . compile compBlank execBlank
+compileSimple s = either (error . show) id
+              <$> compile compBlank execBlank ("^" <> s <> "$")
 
 main :: IO ()
 main = do
