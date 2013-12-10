@@ -1,19 +1,14 @@
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeOperators #-}
 module Main( main
            ) where
 
 import Control.Applicative ((<$>))
 import Control.Monad (replicateM, void)
-import Data.Foldable (traverse_)
 import Data.List (intercalate)
 import Data.Monoid ((<>))
 import Data.RegexShow
 import Data.Traversable (traverse)
 import System.Environment (getArgs)
-
--- array
-import Data.Array.IO
 
 -- extensible-effects
 import Control.Eff
@@ -24,30 +19,17 @@ import Control.Eff.State.Strict
 import Text.Regex.Posix.String
 
 -- system-random-effect
-import System.Random.Effect (Random, mkRandomIO, uniformIntDist)
+import System.Random.Effect
 
 -- text
 import Data.Text (Text, pack, unpack, empty)
 import Data.Text.Read (decimal)
 
+-- vector
+import qualified Data.Vector.Mutable as V (length, read)
+
 import Data.Dictionary
 import Data.Usage
-
-uniformIntegral :: (Integral a, Member (State Random) r) => a -> a -> Eff r a
-uniformIntegral l h = fromInteger <$> uniformIntDist (toInteger l) (toInteger h)
-
--- | This is slow. Write a mutable array version.
-knuthShuffle :: (Ix i, Integral i, Member (State Random) r, SetMember Lift (Lift IO) r)
-             => IOArray i a
-             -> Eff r ()
-knuthShuffle a = do
-      (l, h) <- lift $ getBounds a
-      swaps <- replicateM (rangeSize (l, h)) (uniformIntegral l h)
-      traverse_ swap $ zip [l..h] swaps
-  where
-    swap (i, j) = lift $ do
-        [vi, vj] <- traverse (readArray a) [i, j]
-        traverse_ (uncurry $ writeArray a) [(i, vj), (j, vi)]
 
 withDecimal :: Integral a => Text -> (a -> b) -> b
 withDecimal t f = case decimal t of
@@ -58,6 +40,15 @@ withDecimal t f = case decimal t of
 
 compileSimple :: String -> IO Regex
 compileSimple = fmap (either (error . show) id) . compile compBlank execBlank
+
+main :: IO ()
+main = do
+    args <- getArgs
+    rndgen <- runLift mkRandomIO
+    usage <- createUsage
+    (getUse (pack <$> args) usage)
+      >>= maybe (showUsage usage)
+                (void . runLift . runState rndgen)
 
 createUsage :: (SetMember Lift (Lift IO) r, Member (State Random) r)
             => IO (Usage (Eff r ()))
@@ -82,25 +73,26 @@ gen :: (Member (State Random) r, SetMember Lift (Lift IO) r)
     => IO (Usage (Text -> Eff r ()))
 gen = do
       askDict <- getDictionary
-      num <- compileSimple `withShow` "[0-9]\\+"
-      return $ Uses [( askDict
-                     , Uses [((num, pack "Password length"), Done genLen)]
-                    )]
+      askLength <- getLength
+      return $ Uses [(askDict, Uses [(askLength, Done genLen)])
+                    ]
   where
+    getLength = do
+      num <- compileSimple `withShow` "[0-9]\\+"
+      return (num, pack "Password length")
+
     genLen tlen tdict _ = withDecimal tlen
                         $ \len -> do
                             dict <- readDictionary $ unpack tdict
-                            pass <- replicateM len (randomWord dict)
+                            pass <- replicateM len (randomEntry dict)
                             lift $ putStrLn $ intercalate " " pass
 
-    randomWord :: (SetMember Lift (Lift IO) r, Member (State Random) r)
-               => Dictionary
-               -> Eff r String
-    randomWord (Dictionary ws) = do
-              i <- randomIndex ws
-              lift $ unpack <$> readArray ws i
-
-    randomIndex a = lift (getBounds a) >>= uncurry uniformIntegral
+    randomEntry :: (SetMember Lift (Lift IO) r, Member (State Random) r)
+                => Dictionary
+                -> Eff r String
+    randomEntry (Dictionary ws) = do
+              i <- uniformIntegralDist 0 $ V.length ws - 1
+              lift $ unpack <$> V.read ws i
 
 shuffle :: (Member (State Random) r, SetMember Lift (Lift IO) r)
         => IO (Usage (Text -> Eff r ()))
@@ -111,17 +103,8 @@ shuffle = do
     shuffleDict tdict _ = do
         let sdict = unpack tdict
         dict <- readDictionary sdict
-        knuthShuffle $ fromDictionary dict
+        knuthShuffleM $ fromDictionary dict
         writeDictionary sdict dict
-
-main :: IO ()
-main = do
-    args <- getArgs
-    rndgen <- runLift mkRandomIO
-    usage <- createUsage
-    (getUse (pack <$> args) usage)
-      >>= maybe (showUsage usage)
-                (void . runLift . runState rndgen)
 
 showUsage :: Usage a -> IO ()
 showUsage usage = do

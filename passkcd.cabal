@@ -1,5 +1,5 @@
 Name:               passkcd
-Version:            0.0.1
+Version:            0.0.2
 Synopsis:           Create a human-readable list of random words
 Description:        This package creates a securely random list of words to be
                     used as a password.
@@ -18,10 +18,10 @@ Executable passkcd
     GHC-Options:       -Wall -Werror -threaded -rtsopts=all
 
     Build-Depends: 
-                    system-random-effect ==0.3.*,
+                    system-random-effect ==0.4.*,
                     extensible-effects ==1.2.*,
                     regex-posix ==0.95.*,
-                    array ==0.5.*,
+                    vector ==0.10.9.*,
                     text ==0.11.*,
                     base ==4.*
 
