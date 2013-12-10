@@ -31,10 +31,6 @@ import qualified Data.Vector.Mutable as V (length, read)
 import Data.Dictionary
 import Data.Usage
 
-randomElem :: Member (State Random) r => [a] -> Eff r a
-randomElem l = let len = fromIntegral $ length l
-               in (l !!) <$> uniformIntegralDist 0 (len - 1)
-
 withDecimal :: Integral a => Text -> (a -> b) -> b
 withDecimal t f = case decimal t of
         Right (len, remain) -> if remain == empty
@@ -79,13 +75,9 @@ gen :: (Member (State Random) r, SetMember Lift (Lift IO) r)
 gen = do
       askDict <- getDictionary
       askLength <- getLength
-      alphanum <- compileSimple `withShow` "alphanum"
-      return $ Uses [ ((alphanum, alphanumDesc), Uses [(askLength, Done genAlphanum)])
-                    , (askDict, Uses [(askLength, Done genLen)])
+      return $ Uses [ (askDict, Uses [(askLength, Done genLen)])
                     ]
   where
-    alphanumDesc = pack "Generate an alphanumeric password"
-
     getLength = do
       num <- compileSimple `withShow` "[0-9]\\+"
       return (num, pack "Password length")
@@ -95,12 +87,6 @@ gen = do
                             dict <- readDictionary $ unpack tdict
                             pass <- replicateM len (randomEntry dict)
                             lift $ putStrLn $ intercalate " " pass
-
-    genAlphanum tlen _ _ = withDecimal tlen
-                         $ \len -> replicateM len (randomElem alphanums)
-                               >>= lift . putStrLn
-
-    alphanums = ['0'..'9'] <> ['a'..'z']
 
     randomEntry :: (SetMember Lift (Lift IO) r, Member (State Random) r)
                 => Dictionary
